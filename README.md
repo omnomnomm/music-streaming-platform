@@ -30,7 +30,7 @@ Architecture: **React front end ↔ Supabase (Auth, API, RLS, stored functions) 
 
 ## Database design
 
-The full design document (requirements, ER model, relational schema, constraints, normalization and design decisions) is in [`docs/DBMS_Midsem_Submission.pdf`](docs/DBMS_Midsem_Submission.pdf).
+The full design document (requirements, ER model, relational schema, constraints, normalization and design decisions) is in [`docs/DBMS_Midsem_Submission v3.pdf`](<docs/DBMS_Midsem_Submission v3.pdf>).
 
 ### ER diagram
 
@@ -52,13 +52,22 @@ The schema has 11 relations: `artist`, `album`, `song`, `performs`, `users`, `pl
 
 ## Current progress (mid-semester)
 
-The ER model, the relational schema and the technology stack and application architecture are complete.
+The ER model, the relational schema and the technology stack and application architecture are complete. The implementation now matches the design doc end to end:
+
+- **Schema** (`sql/01_schema.sql`): all 11 relations, exactly as designed.
+- **Triggers and transactions** (`sql/02_triggers_and_functions.sql`): the business-rule triggers plus `release_album()`, `record_listen()`, `add_to_playlist()` and `subscribe()` as single-transaction stored functions.
+- **Row Level Security** (`sql/03_rls_policies.sql`): public catalogue reads; listener-, artist- and admin-scoped writes.
+- **Views and planned queries** (`sql/04_views_and_queries.sql`): the Charts/Wrapped reporting views plus the queries from the design doc.
+- **Seed data** (`sql/05_seed_catalog.sql`, `sql/06_seed_users_and_activity.sql`).
+- **Frontend** (`src/`): real Supabase Auth, role-gated routes (`/admin`, `/artist-dashboard`), Charts, Wrapped, playlists, likes and listening history, all reading/writing through `src/services/api.js`.
+
+`sql/_old_pre_midsem_redesign/` holds the pre-design-doc schema/seed scripts, kept for reference rather than deleted.
 
 ## Repository structure
 
 ```
 ├── docs/                 design document and diagrams
-│   ├── DBMS_Midsem_Submission.pdf
+│   ├── DBMS_Midsem_Submission v3.pdf
 │   └── images/
 ├── sql/                  schema, functions, triggers, views, indexes and seed scripts
 └── src/                  React front end
@@ -68,7 +77,22 @@ The ER model, the relational schema and the technology stack and application arc
     └── services/         data access layer and Supabase client
 ```
 
-Setup and run instructions will be added along with the code.
+## Setup and run
+
+1. **Create `.env`** (see `.env.example`) with your Supabase project's URL and anon key (Project Settings → Data API). Vite only exposes vars prefixed `VITE_`.
+2. **Install and run the frontend:**
+   ```bash
+   npm install
+   npm run dev
+   ```
+   Opens at `http://localhost:5173`.
+3. **Apply the database** — in the Supabase SQL Editor (or via `psql` against the connection string from Project Settings → Database), run the files in `sql/` **in order**: `01_schema.sql` → `02_triggers_and_functions.sql` → `03_rls_policies.sql` → `04_views_and_queries.sql` → `05_seed_catalog.sql` → `06_seed_users_and_activity.sql`. `06` seeds real Supabase Auth accounts directly via SQL (`crypt()`/`pgcrypto`). Every seeded account's password is **`demo-password-123`**.
+
+   Recommended one-time Dashboard setting: **Authentication → Sign In / Providers → Email → turn "Confirm email" off.** With it on, every signup sends a confirmation email, and Supabase's default shared mailer has a low rate limit — a few signups in testing will exhaust it and block further signups until the limit resets.
+
+### Known limitations / next steps
+
+- Self-serve signup only ever creates **listener** accounts; artist/admin accounts are provisioned by an admin via the Admin Panel's Account Type field (picking an existing unlinked artist profile) — there isn't yet an admin flow to create a *new* artist profile from the UI, only via direct SQL as in `05_seed_catalog.sql`.
 
 ## Contributions (till mid-semester)
 
