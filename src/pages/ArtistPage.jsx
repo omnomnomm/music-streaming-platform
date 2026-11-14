@@ -4,6 +4,7 @@ import { getArtistById, getAlbumsByArtist, getArtistSongs, getPerformsByArtist, 
 import { AlbumCard, SongRow } from '../components/Cards';
 import { CheckCircle2, Play, Users } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
+import { artistBanner } from '../utils/images';
 
 export default function ArtistPage() {
     const { id } = useParams();
@@ -57,7 +58,7 @@ export default function ArtistPage() {
             {/* Hero Banner */}
             <div className="relative h-80 overflow-hidden">
                 <img
-                    src={`https://picsum.photos/seed/${artist.artist_name.toLowerCase().replace(/\s/g, '')}/1200/400`}
+                    src={artistBanner(artist.artist_name)}
                     alt=""
                     className="w-full h-full object-cover"
                 />

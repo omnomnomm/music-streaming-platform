@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { usePlayer } from '../context/PlayerContext';
 import { getArtistSongs, getArtistAlbums, getArtistById, getArtistMonthlyListeners, releaseAlbum, deleteSong } from '../services/api';
 import { Mic2, Plus, Trash2, Play, Disc, Music, X, Album } from 'lucide-react';
+import { albumCover, artistImage } from '../utils/images';
 
 export default function ArtistDashboard() {
     const { user } = useAuth();
@@ -59,7 +60,7 @@ export default function ArtistDashboard() {
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-full overflow-hidden bg-spotify-card">
-                        <img src={`https://picsum.photos/seed/${(artist?.artist_name || '').toLowerCase().replace(/\s/g, '')}/128/128`} alt="" className="w-full h-full object-cover" />
+                        <img src={artistImage(artist?.artist_name)} alt="" className="w-full h-full object-cover" />
                     </div>
                     <div>
                         <p className="text-xs uppercase tracking-[0.2em] text-spotify-green font-semibold">Artist Dashboard</p>
@@ -98,7 +99,7 @@ export default function ArtistDashboard() {
                     <div className="flex gap-4 overflow-x-auto pb-2">
                         {albums.map(al => (
                             <div key={al.album_id} className="glass rounded-xl p-4 min-w-[160px] flex-shrink-0">
-                                <img src={`https://picsum.photos/seed/album${al.album_id}/120/120`} alt="" className="w-full aspect-square rounded-lg object-cover mb-3" />
+                                <img src={albumCover(al.album_id)} alt="" className="w-full aspect-square rounded-lg object-cover mb-3" />
                                 <p className="font-semibold text-sm truncate">{al.title}</p>
                                 <p className="text-xs text-spotify-subtle capitalize">{al.album_type} · {al.release_date}</p>
                             </div>

@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { getUserWrapped } from '../services/api';
 import { Sparkles, Music, Clock, Disc, User, Headphones } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { artistImage } from '../utils/images';
 
 const COLORS = ['#1DB954', '#1ed760', '#15803d', '#4ade80', '#86efac', '#a3e635'];
 
@@ -92,7 +93,7 @@ export default function WrappedPage() {
                             {data.topArtists.map((a, i) => (
                                 <div key={a.artist_id} className="flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 transition">
                                     <span className="text-xl font-black text-spotify-green w-8 text-center">{i + 1}</span>
-                                    <img src={`https://picsum.photos/seed/${(a.artist_name || '').toLowerCase().replace(/\s/g, '')}/80/80`} alt="" className="w-12 h-12 rounded-full object-cover" />
+                                    <img src={artistImage(a.artist_name)} alt="" className="w-12 h-12 rounded-full object-cover" />
                                     <div className="flex-1 min-w-0">
                                         <p className="font-semibold truncate">{a.artist_name}</p>
                                         <p className="text-xs text-spotify-subtle">{a.genre}</p>

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ArtistCard, AlbumCard, SongRow } from '../components/Cards';
 import { getArtists, getAlbums, getTopSongs, getUserTopArtist, getSongArtists, getAlbumById } from '../services/api';
+import { artistImage } from '../utils/images';
 
 export default function HomePage() {
     const { user } = useAuth();
@@ -76,7 +77,7 @@ export default function HomePage() {
                             to={`/artist/${artist.artist_id}`}
                             className="flex items-center gap-3 bg-white/5 rounded-lg overflow-hidden hover:bg-white/10 transition group"
                         >
-                            <img src={`https://picsum.photos/seed/${artist.artist_name.toLowerCase().replace(/\s/g, '')}/64/64`} alt="" className="w-16 h-16 object-cover" />
+                            <img src={artistImage(artist.artist_name)} alt="" className="w-16 h-16 object-cover" />
                             <span className="text-sm font-medium">{artist.artist_name}</span>
                         </Link>
                     ))}

@@ -3,9 +3,10 @@ import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Repeat, Shuffle, 
 import { usePlayer } from '../context/PlayerContext';
 import { useAuth } from '../context/AuthContext';
 import { isLiked, toggleLike } from '../services/api';
+import { songCover } from '../utils/images';
 
 export default function PlayerBar() {
-    const { currentSong, isPlaying, progress, volume, togglePlay, seek, changeVolume, skipNext, skipBack } = usePlayer();
+    const { currentSong, isPlaying, progress, currentTime, duration, volume, togglePlay, seek, changeVolume, skipNext, skipBack } = usePlayer();
     const { user } = useAuth();
     const [liked, setLiked] = useState(false);
     const [likeLoading, setLikeLoading] = useState(false);
@@ -32,8 +33,10 @@ export default function PlayerBar() {
         </div>
     );
 
-    const elapsed = Math.floor((progress / 100) * currentSong.duration_seconds);
-    const formatTime = (s) => `${Math.floor(s / 60)}:${String(Math.round(s) % 60).padStart(2, '0')}`;
+    const formatTime = (s) => {
+        const secs = Math.floor(s || 0);
+        return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+    };
 
     const leadArtist = currentSong.artists?.find(a => a.role === 'Lead');
     const featuredArtists = currentSong.artists?.filter(a => a.role === 'Featured') || [];
@@ -58,7 +61,7 @@ export default function PlayerBar() {
             {/* Song Info */}
             <div className="flex items-center gap-3 w-72 min-w-0">
                 <div className="w-14 h-14 rounded-md bg-spotify-card flex-shrink-0 overflow-hidden">
-                    <img src={`https://picsum.photos/seed/song${currentSong.song_id}/56/56`} alt="" className="w-full h-full object-cover" />
+                    <img src={songCover(currentSong)} alt="" className="w-full h-full object-cover" />
                 </div>
                 <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium truncate">{currentSong.title}</p>
@@ -81,11 +84,11 @@ export default function PlayerBar() {
                     <button className="text-spotify-subtle hover:text-white transition"><Repeat size={16} /></button>
                 </div>
                 <div className="flex items-center gap-2 w-full">
-                    <span className="text-[11px] text-spotify-subtle w-10 text-right">{formatTime(elapsed)}</span>
+                    <span className="text-[11px] text-spotify-subtle w-10 text-right">{formatTime(currentTime)}</span>
                     <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden group cursor-pointer" onClick={handleSeek}>
-                        <div className="h-full bg-spotify-green rounded-full transition-all duration-150 group-hover:bg-spotify-green" style={{ width: `${progress}%` }} />
+                        <div className="h-full bg-spotify-green rounded-full" style={{ width: `${progress}%` }} />
                     </div>
-                    <span className="text-[11px] text-spotify-subtle w-10">{formatTime(currentSong.duration_seconds)}</span>
+                    <span className="text-[11px] text-spotify-subtle w-10">{formatTime(duration)}</span>
                 </div>
             </div>
 

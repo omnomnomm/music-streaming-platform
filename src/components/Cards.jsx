@@ -4,13 +4,14 @@ import { Play, Heart } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { getArtistById, isLiked, toggleLike } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { albumCover, artistImage, songCover } from '../utils/images';
 
 export function ArtistCard({ artist }) {
     return (
         <Link to={`/artist/${artist.artist_id}`} className="hover-card group p-4 rounded-xl bg-spotify-card/50 block">
             <div className="relative mb-4">
                 <img
-                    src={`https://picsum.photos/seed/${artist.artist_name.toLowerCase().replace(/\s/g, '')}/400/400`}
+                    src={artistImage(artist.artist_name)}
                     alt={artist.artist_name}
                     className="w-full aspect-square rounded-full object-cover shadow-lg shadow-black/40"
                 />
@@ -37,7 +38,7 @@ export function AlbumCard({ album }) {
         <Link to={`/album/${album.album_id}`} className="hover-card group p-4 rounded-xl bg-spotify-card/50 block">
             <div className="relative mb-4">
                 <img
-                    src={`https://picsum.photos/seed/album${album.album_id}/300/300`}
+                    src={albumCover(album.album_id)}
                     alt={album.title}
                     className="w-full aspect-square rounded-lg object-cover shadow-lg shadow-black/40"
                 />
@@ -95,6 +96,9 @@ export function SongRow({ song, index, showAlbum = false, onLikeChange }) {
                     index
                 )}
             </span>
+            {song.album_id != null && (
+                <img src={songCover(song)} alt="" className="w-10 h-10 rounded object-cover flex-shrink-0" />
+            )}
             <div className="flex-1 min-w-0">
                 <p className={`text-sm font-medium truncate ${isCurrentlyPlaying ? 'text-spotify-green' : ''}`}>{song.title}</p>
                 {song.artistNames && <p className="text-xs text-spotify-subtle truncate">{song.artistNames}</p>}

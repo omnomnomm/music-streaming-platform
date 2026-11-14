@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getUserPlaylists, getPlaylistSongs, createPlaylist, deletePlaylist } from '../services/api';
 import { ListMusic, Plus, Trash2, X } from 'lucide-react';
+import { albumCover } from '../utils/images';
 
 export default function PlaylistsPage() {
     const { user } = useAuth();
@@ -119,7 +120,7 @@ export default function PlaylistsPage() {
                                     {[0, 1, 2, 3].map(i => (
                                         <div key={i} className="overflow-hidden bg-spotify-card flex items-center justify-center">
                                             <img
-                                                src={`https://picsum.photos/seed/pl${p.playlist_id}i${i}/150/150`}
+                                                src={albumCover(((p.playlist_id * 4 + i) % 18) + 1)}
                                                 alt=""
                                                 className="w-full h-full object-cover"
                                             />

@@ -4,6 +4,7 @@ import { getAlbumById, getSongsByAlbum, getArtistById, getSongArtists } from '..
 import { SongRow } from '../components/Cards';
 import { Play, Clock } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
+import { albumCover, artistImage } from '../utils/images';
 
 export default function AlbumPage() {
     const { id } = useParams();
@@ -55,7 +56,7 @@ export default function AlbumPage() {
             {/* Header */}
             <div className="flex items-end gap-6 p-6 bg-gradient-to-b from-spotify-card to-spotify-black">
                 <img
-                    src={`https://picsum.photos/seed/album${album.album_id}/224/224`}
+                    src={albumCover(album.album_id)}
                     alt={album.title}
                     className="w-56 h-56 rounded-lg shadow-2xl shadow-black/60 flex-shrink-0"
                 />
@@ -65,7 +66,7 @@ export default function AlbumPage() {
                     <div className="flex items-center gap-2 text-sm">
                         {artist && (
                             <>
-                                <img src={`https://picsum.photos/seed/${artist.artist_name.toLowerCase().replace(/\s/g, '')}/24/24`} alt="" className="w-6 h-6 rounded-full" />
+                                <img src={artistImage(artist.artist_name)} alt="" className="w-6 h-6 rounded-full" />
                                 <Link to={`/artist/${artist.artist_id}`} className="font-semibold hover:underline">{artist.artist_name}</Link>
                                 <span className="text-spotify-subtle">·</span>
                             </>
