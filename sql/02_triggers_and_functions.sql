@@ -102,8 +102,8 @@ BEGIN
     END IF;
     RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
-
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+-- SECURITY DEFINER: listeners can't UPDATE song under RLS, so the trigger runs as the table owner.
 DROP TRIGGER IF EXISTS t3_play_count ON listening_history;
 CREATE TRIGGER t3_play_count
     AFTER INSERT OR DELETE ON listening_history
