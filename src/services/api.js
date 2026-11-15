@@ -13,20 +13,41 @@ import { supabase } from './supabaseClient';
 // account has to point at an existing artist catalog entry, and that's an
 // admin-only insert (RLS).
 export async function signUp({ name, email, password, dateOfBirth, country }) {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    // The profile fields ride along as auth user metadata, so if email
+    // confirmation is on (no session yet) the profile row can still be created
+    // on first login — see createProfileFromMetadata().
+    const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { name, date_of_birth: dateOfBirth, country } },
+    });
     if (error) return { success: false, error: error.message };
     if (!data.session) {
         return { success: false, error: 'Account created — check your email to confirm it, then log in.' };
     }
 
-    const { data: profile, error: profileError } = await supabase
+    const { profile, error: profileError } = await createProfileFromMetadata(data.user);
+    if (!profile) return { success: false, error: profileError };
+    return { success: true, user: profile };
+}
+
+// Inserts the public.users row for a signed-in auth user from the metadata
+// saved at sign-up. RLS lets a user insert only their own row (auth_id = auth.uid()).
+export async function createProfileFromMetadata(authUser) {
+    const m = authUser?.user_metadata || {};
+    if (!m.name || !m.date_of_birth || !m.country) {
+        return { profile: null, error: 'Signed in, but no matching profile was found.' };
+    }
+    const { data, error } = await supabase
         .from('users')
-        .insert([{ auth_id: data.user.id, name, email, date_of_birth: dateOfBirth, country, account_type: 'listener' }])
+        .insert([{ auth_id: authUser.id, name: m.name, email: authUser.email, date_of_birth: m.date_of_birth, country: m.country, account_type: 'listener' }])
         .select()
         .single();
+    if (data) return { profile: data, error: null };
 
-    if (profileError) return { success: false, error: profileError.message };
-    return { success: true, user: profile };
+    // Another listener (e.g. onAuthStateChange) may have just created it.
+    const { data: existing } = await supabase.from('users').select('*').eq('auth_id', authUser.id).maybeSingle();
+    return existing ? { profile: existing, error: null } : { profile: null, error: error.message };
 }
 
 // ── Artists ───────────────────────────────

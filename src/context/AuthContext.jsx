@@ -1,19 +1,22 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { signUp as apiSignUp } from '../services/api';
+import { signUp as apiSignUp, createProfileFromMetadata } from '../services/api';
 
 const AuthContext = createContext(null);
 
-// Loads the public.users profile row for a Supabase Auth session (by auth_id),
-// and retries briefly — right after sign-up, the row may not have committed yet.
+// Loads the public.users profile row for a Supabase Auth session (by auth_id).
+// Retries briefly (right after sign-up the row may not have committed yet), and
+// if there is still none — the account was confirmed by email, so sign-up never
+// had a session to insert it — creates it from the sign-up metadata.
 async function loadProfile(authUser) {
     if (!authUser) return null;
     for (let attempt = 0; attempt < 3; attempt++) {
-        const { data } = await supabase.from('users').select('*').eq('auth_id', authUser.id).single();
+        const { data } = await supabase.from('users').select('*').eq('auth_id', authUser.id).maybeSingle();
         if (data) return data;
         await new Promise(r => setTimeout(r, 300));
     }
-    return null;
+    const { profile } = await createProfileFromMetadata(authUser);
+    return profile;
 }
 
 export function AuthProvider({ children }) {
