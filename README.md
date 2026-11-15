@@ -44,15 +44,19 @@ Primary keys are underlined; arrows go from each foreign key to the key it refer
 
 The schema has 11 relations: `artist`, `album`, `song`, `performs`, `users`, `plan`, `subscription`, `playlist`, `playlist_song`, `likes` and `listening_history`. All of them are in BCNF. `listening_history` is a weak entity identified by (`user_id`, `song_id`, `listened_at`). `song.play_count` is the one deliberately stored derived value, and a trigger keeps it consistent.
 
-## Planned workflows
+## Workflows
 
 1. **Album release (artist).** A stored function inserts the album, its songs and the performer credits in one transaction, and rolls the whole release back if any track is invalid.
 2. **Listening and charts (listener).** Each play is recorded and validated by triggers, which also update play counts. The Charts and Wrapped pages read SQL views built with CTEs, window functions and aggregation.
 3. **Playlists and subscription (listener).** Duplicate songs, the free-tier playlist limit and cascading deletes are all enforced by the database, and the front end shows the resulting errors.
 
-## Current progress (mid-semester)
+## Final submission
 
-The ER model, the relational schema and the technology stack and application architecture are complete. The implementation now matches the design doc end to end:
+The submitted version is the commit tagged **`final`** (`git checkout final`); its hash is also recorded on the Demo Sheet.
+
+## Implementation
+
+The implementation matches the design document end to end:
 
 - **Schema** (`sql/01_schema.sql`): all 11 relations, exactly as designed.
 - **Triggers and transactions** (`sql/02_triggers_and_functions.sql`): the business-rule triggers plus `release_album()`, `record_listen()`, `add_to_playlist()` and `subscribe()` as single-transaction stored functions.
@@ -95,7 +99,9 @@ The ER model, the relational schema and the technology stack and application arc
 
 - Self-serve signup only ever creates **listener** accounts; artist/admin accounts are provisioned by an admin via the Admin Panel's Account Type field (picking an existing unlinked artist profile) — there isn't yet an admin flow to create a *new* artist profile from the UI, only via direct SQL as in `05_seed_catalog.sql`.
 
-## Contributions (till mid-semester)
+## Contributions
+
+### Design phase (till mid-semester)
 
 | Member | Contribution |
 |---|---|
@@ -104,3 +110,13 @@ The ER model, the relational schema and the technology stack and application arc
 | Shreyas Ghosh | Normalization (functional dependencies, BCNF analysis); application design (architecture and workflows) |
 | Shreya Agrawal | Application design (technology stack, planned queries and DBMS features); documentation (design report) |
 | Piyush Gaikwad | Normalization (redundancy analysis and the treatment of derived attributes); documentation (README and GitHub repository) |
+
+### Implementation phase (mid-semester to final)
+
+| Member | Contribution |
+|---|---|
+| Ritwik Sethi | Database implementation: schema and integrity constraints (`01`), triggers T1–T5 and the transactional stored functions `release_album()`, `record_listen()`, `add_to_playlist()`, `subscribe()` (`02`), Row Level Security policies (`03`); Supabase Auth integration; end-to-end testing and bug fixes |
+| Arihant Rakhecha | Reporting SQL: views and queries Q1–Q8 with CTEs, window functions and correlated subqueries (`04`, `07`); React front end and the `api.js` data-access layer (Charts, Wrapped, Library, Artist Dashboard, Admin Panel, music player) |
+| Shreyas Ghosh | Sample data: catalogue and user-activity seed scripts (`05`, `06`), including seeded Supabase Auth accounts; sample album and artist artwork (`scripts/generate-sample-images.mjs`, `public/images/`); updated ER and relational schema diagrams for the final design document |
+| Shreya Agrawal | Final Database Design Document; Demo Sheet; verification of the Charts and Wrapped report outputs against the underlying SQL queries; demonstration flow for the lab viva |
+| Piyush Gaikwad | README and setup/reproducibility instructions; repository maintenance (`.gitignore`, `.env.example`, keeping credentials out of the repo); role-based UI testing across listener, artist and admin accounts |
