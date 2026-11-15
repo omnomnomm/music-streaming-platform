@@ -59,6 +59,7 @@ The ER model, the relational schema and the technology stack and application arc
 - **Row Level Security** (`sql/03_rls_policies.sql`): public catalogue reads; listener-, artist- and admin-scoped writes.
 - **Views and planned queries** (`sql/04_views_and_queries.sql`): the Charts/Wrapped reporting views plus the queries from the design doc.
 - **Seed data** (`sql/05_seed_catalog.sql`, `sql/06_seed_users_and_activity.sql`).
+- **App report views** (`sql/07_app_report_views.sql`): Q5–Q8 and the Wrapped lists wrapped as views so the Charts, Wrapped and Library screens read them directly.
 - **Frontend** (`src/`): real Supabase Auth, role-gated routes (`/admin`, `/artist-dashboard`), Charts, Wrapped, playlists, likes and listening history, all reading/writing through `src/services/api.js`.
 
 `sql/_old_pre_midsem_redesign/` holds the pre-design-doc schema/seed scripts, kept for reference rather than deleted.
@@ -86,7 +87,7 @@ The ER model, the relational schema and the technology stack and application arc
    npm run dev
    ```
    Opens at `http://localhost:5173`.
-3. **Apply the database** — in the Supabase SQL Editor (or via `psql` against the connection string from Project Settings → Database), run the files in `sql/` **in order**: `01_schema.sql` → `02_triggers_and_functions.sql` → `03_rls_policies.sql` → `04_views_and_queries.sql` → `05_seed_catalog.sql` → `06_seed_users_and_activity.sql`. `06` seeds real Supabase Auth accounts directly via SQL (`crypt()`/`pgcrypto`). Every seeded account's password is **`demo-password-123`**.
+3. **Apply the database** — in the Supabase SQL Editor (or via `psql` against the connection string from Project Settings → Database), run the files in `sql/` **in order**: `01_schema.sql` → `02_triggers_and_functions.sql` → `03_rls_policies.sql` → `04_views_and_queries.sql` → `05_seed_catalog.sql` → `06_seed_users_and_activity.sql` → `07_app_report_views.sql`. `06` seeds real Supabase Auth accounts directly via SQL (`crypt()`/`pgcrypto`). Every seeded account's password is **`demo-password-123`**.
 
    Recommended one-time Dashboard setting: **Authentication → Sign In / Providers → Email → turn "Confirm email" off.** With it on, every signup sends a confirmation email, and Supabase's default shared mailer has a low rate limit — a few signups in testing will exhaust it and block further signups until the limit resets.
 

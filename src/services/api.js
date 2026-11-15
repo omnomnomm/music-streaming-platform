@@ -205,34 +205,26 @@ export async function getMostPopularArtist() {
     return { ...data, streams: data.monthly_listeners };
 }
 
-// performs is public-read and not time-scoped, so this needs no view.
+// Most distinct collaborators — Q6 (self-join on performs), via v_artist_collaborators.
 export async function getMostCollaborativeArtist() {
-    const { data: allPerforms } = await supabase.from('performs').select('*').eq('role', 'Featured');
-    if (!allPerforms) return null;
-    const collabs = {};
-    allPerforms.forEach(p => { collabs[p.artist_id] = (collabs[p.artist_id] || 0) + 1; });
-    const sorted = Object.entries(collabs).sort((a, b) => b[1] - a[1]);
-    if (sorted.length === 0) return null;
-    const artist = await getArtistById(Number(sorted[0][0]));
-    return artist ? { ...artist, collaborations: sorted[0][1] } : null;
+    const { data } = await supabase
+        .from('v_artist_collaborators')
+        .select('*')
+        .order('distinct_collaborators', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+    return data ? { ...data, collaborations: data.distinct_collaborators } : null;
 }
 
-// A listener's own top artist — reads their own listening_history, which RLS
-// already scopes to just them, so this needs no view.
+// A listener's own top artist — rank 1 in v_user_top_artists.
 export async function getUserTopArtist(userId) {
-    const { data: history } = await supabase.from('listening_history').select('song_id').eq('user_id', Number(userId));
-    if (!history || history.length === 0) return null;
-    const songIds = [...new Set(history.map(h => h.song_id))];
-    const { data: performs } = await supabase.from('performs').select('*').in('song_id', songIds).eq('role', 'Lead');
-    const counts = {};
-    history.forEach(l => {
-        const perf = (performs || []).filter(p => p.song_id === l.song_id);
-        perf.forEach(p => { counts[p.artist_id] = (counts[p.artist_id] || 0) + 1; });
-    });
-    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-    if (sorted.length === 0) return null;
-    const artist = await getArtistById(Number(sorted[0][0]));
-    return artist ? { ...artist, plays: sorted[0][1] } : null;
+    const { data } = await supabase
+        .from('v_user_top_artists')
+        .select('*')
+        .eq('user_id', Number(userId))
+        .eq('rank', 1)
+        .maybeSingle();
+    return data;
 }
 
 export async function getDeviceDistribution() {
@@ -242,23 +234,16 @@ export async function getDeviceDistribution() {
         .sort((a, b) => b.count - a.count);
 }
 
-// Admin-only in practice (gated in ChartsPage UI) — a non-admin's own
-// subscription row is all RLS would return anyway, which would misreport as
-// "total" platform revenue, so this should only ever be called for an admin.
+// Monthly revenue by plan — Q5, via v_monthly_revenue. The view itself returns
+// rows only to an admin; the Charts page also only calls this for admins.
 export async function getSubscriptionRevenue() {
-    const [{ data: subs }, plans] = await Promise.all([
-        supabase.from('subscription').select('*').eq('payment_status', 'Paid'),
-        getPlans(),
-    ]);
-    const rates = Object.fromEntries(plans.map(p => [p.plan_type, Number(p.monthly_price)]));
-    const paid = subs || [];
-    const total = paid.reduce((sum, s) => sum + (rates[s.plan_type] || 0), 0);
+    const { data } = await supabase.from('v_monthly_revenue').select('*').order('month').order('plan_type');
+    const rows = (data || []).map(r => ({ ...r, revenue: Number(r.revenue) }));
+    const subscribers = (plan) => rows.filter(r => r.plan_type === plan).reduce((n, r) => n + r.paying_subscribers, 0);
     return {
-        total: total.toFixed(2),
-        breakdown: {
-            Premium: paid.filter(s => s.plan_type === 'Premium').length,
-            Family: paid.filter(s => s.plan_type === 'Family').length,
-        },
+        rows,
+        total: rows.reduce((sum, r) => sum + r.revenue, 0).toFixed(2),
+        breakdown: { Premium: subscribers('Premium'), Family: subscribers('Family') },
     };
 }
 
@@ -283,57 +268,58 @@ export async function getListeningTrends(days = 30) {
 }
 
 // ── User Wrapped / Personal Stats ────────
-// Reads the caller's own listening_history, which RLS already scopes to just
-// them (or to the target user for an admin), so — like getUserTopArtist — this
-// needs no reporting view.
+// Everything here is computed in SQL: the summary row comes from v_user_wrapped
+// (Q4) and the ranked lists from the per-user views in 07_app_report_views.sql.
 export async function getUserWrapped(userId) {
-    const { data: history } = await supabase.from('listening_history').select('song_id, listened_at').eq('user_id', Number(userId));
-    if (!history || history.length === 0) return null;
-    const songIds = [...new Set(history.map(h => h.song_id))];
-    const { data: songs } = await supabase.from('song').select('*').in('song_id', songIds);
-    const { data: performs } = await supabase.from('performs').select('song_id, artist_id').in('song_id', songIds).eq('role', 'Lead');
-    const artistIds = [...new Set((performs || []).map(p => p.artist_id))];
-    const { data: artists } = await supabase.from('artist').select('*').in('artist_id', artistIds);
-
-    const songMap = {};
-    (songs || []).forEach(s => { songMap[s.song_id] = s; });
-    const totalSeconds = history.reduce((sum, h) => sum + (songMap[h.song_id]?.duration_seconds || 0), 0);
-
-    const songCounts = {};
-    history.forEach(h => { songCounts[h.song_id] = (songCounts[h.song_id] || 0) + 1; });
-    const topSongIds = Object.entries(songCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
-    const topSongs = topSongIds.map(([id, plays]) => ({ ...(songMap[Number(id)] || {}), plays }));
-
-    const songArtist = {};
-    (performs || []).forEach(p => { songArtist[p.song_id] = p.artist_id; });
-    const artistCounts = {};
-    history.forEach(h => {
-        const aid = songArtist[h.song_id];
-        if (aid) artistCounts[aid] = (artistCounts[aid] || 0) + 1;
-    });
-    const topArtistIds = Object.entries(artistCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
-    const artistMap = {};
-    (artists || []).forEach(a => { artistMap[a.artist_id] = a; });
-    const topArtists = topArtistIds.map(([id, plays]) => ({ ...(artistMap[Number(id)] || {}), plays }));
-
-    const genreCounts = {};
-    history.forEach(h => {
-        const aid = songArtist[h.song_id];
-        const genre = artistMap[aid]?.genre;
-        if (genre) genreCounts[genre] = (genreCounts[genre] || 0) + 1;
-    });
-    const topGenre = Object.entries(genreCounts).sort((a, b) => b[1] - a[1])[0];
+    const uid = Number(userId);
+    const [wrapped, songs, songCount, artists, artistCount, genres] = await Promise.all([
+        supabase.from('v_user_wrapped').select('*').eq('user_id', uid).maybeSingle(),
+        supabase.from('v_user_top_songs').select('*').eq('user_id', uid).lte('rank', 5).order('rank'),
+        supabase.from('v_user_top_songs').select('song_id', { count: 'exact', head: true }).eq('user_id', uid),
+        supabase.from('v_user_top_artists').select('*').eq('user_id', uid).lte('rank', 5).order('rank'),
+        supabase.from('v_user_top_artists').select('artist_id', { count: 'exact', head: true }).eq('user_id', uid),
+        supabase.from('v_user_genre_breakdown').select('*').eq('user_id', uid).order('plays', { ascending: false }),
+    ]);
+    const w = wrapped.data;
+    if (!w || !w.total_streams) return null;
 
     return {
-        totalMinutes: Math.round(totalSeconds / 60),
-        totalStreams: history.length,
-        uniqueSongs: songIds.length,
-        uniqueArtists: artistIds.length,
-        topSongs,
-        topArtists,
-        topGenre: topGenre ? { genre: topGenre[0], count: topGenre[1] } : null,
-        genreBreakdown: Object.entries(genreCounts).map(([genre, count]) => ({ genre, count })).sort((a, b) => b.count - a.count),
+        totalMinutes: Number(w.total_minutes),
+        totalStreams: w.total_streams,
+        uniqueSongs: songCount.count || 0,
+        uniqueArtists: artistCount.count || 0,
+        topSongs: songs.data || [],
+        topArtists: artists.data || [],
+        topGenre: w.top_genre ? { genre: w.top_genre, count: w.top_genre_plays } : null,
+        genreBreakdown: (genres.data || []).map(g => ({ genre: g.genre, count: g.plays })),
     };
+}
+
+// Songs the caller has played 5+ times but not liked — Q7, via v_on_repeat_not_liked.
+export async function getOnRepeatNotLiked() {
+    const { data } = await supabase.from('v_on_repeat_not_liked').select('*').order('play_count', { ascending: false });
+    return data || [];
+}
+
+// Top 10 songs in one country over the last 30 days — Q1, via v_top_songs_by_country.
+export async function getTopSongsInCountry(country) {
+    const { data } = await supabase
+        .from('v_top_songs_by_country')
+        .select('*')
+        .eq('country', country)
+        .lte('rank', 10)
+        .order('rank');
+    return data || [];
+}
+
+// Songs played more than their album's average — Q8, via v_songs_above_album_avg.
+export async function getStandoutTracks(limit = 10) {
+    const { data } = await supabase
+        .from('v_songs_above_album_avg')
+        .select('*')
+        .order('play_count', { ascending: false })
+        .limit(limit);
+    return data || [];
 }
 
 export async function search(query) {
@@ -421,8 +407,8 @@ export async function createPlaylist(userId, playlistName) {
 }
 
 // Delete a playlist
+// playlist_song rows go with it through the FK's ON DELETE CASCADE.
 export async function deletePlaylist(playlistId) {
-    await supabase.from('playlist_song').delete().eq('playlist_id', Number(playlistId));
     const { data } = await supabase.from('playlist').delete().eq('playlist_id', Number(playlistId)).select().single();
     return data;
 }

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getUserWrapped } from '../services/api';
-import { Sparkles, Music, Clock, Disc, User, Headphones } from 'lucide-react';
+import { getUserWrapped, getOnRepeatNotLiked } from '../services/api';
+import { SongRow } from '../components/Cards';
+import { Sparkles, Music, Clock, Disc, User, Headphones, Repeat } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { artistImage } from '../utils/images';
 
@@ -10,13 +11,23 @@ const COLORS = ['#1DB954', '#1ed760', '#15803d', '#4ade80', '#86efac', '#a3e635'
 export default function WrappedPage() {
     const { user } = useAuth();
     const [data, setData] = useState(null);
+    const [onRepeat, setOnRepeat] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (user) {
-            getUserWrapped(user.user_id).then(d => { setData(d); setLoading(false); });
+            Promise.all([getUserWrapped(user.user_id), getOnRepeatNotLiked()]).then(([d, r]) => {
+                setData(d);
+                setOnRepeat(r);
+                setLoading(false);
+            });
         }
     }, [user]);
+
+    // Liking a song removes it from "On repeat, not liked yet" (the view's NOT EXISTS).
+    const handleLikeChange = (songId, liked) => {
+        if (liked) setOnRepeat(list => list.filter(s => s.song_id !== songId));
+    };
 
     if (loading) return <div className="p-6 text-spotify-subtle animate-pulse text-lg">Loading your stats...</div>;
     if (!data) return (
@@ -146,6 +157,24 @@ export default function WrappedPage() {
                             </Bar>
                         </BarChart>
                     </ResponsiveContainer>
+                </section>
+            )}
+
+            {/* Songs played 5+ times but not liked (Q7, v_on_repeat_not_liked) */}
+            {onRepeat.length > 0 && (
+                <section className="glass rounded-xl p-6">
+                    <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
+                        <Repeat size={18} className="text-spotify-green" /> On Repeat, Not Liked Yet
+                    </h2>
+                    <p className="text-xs text-spotify-subtle mb-4">Songs you've played at least 5 times but haven't liked</p>
+                    {onRepeat.map((song, i) => (
+                        <SongRow
+                            key={song.song_id}
+                            song={{ ...song, streams: song.play_count }}
+                            index={i + 1}
+                            onLikeChange={handleLikeChange}
+                        />
+                    ))}
                 </section>
             )}
         </div>

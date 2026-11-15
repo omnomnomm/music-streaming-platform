@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react';
-import { getTopSongs, getMostPopularArtist, getMostCollaborativeArtist, getDeviceDistribution, getSubscriptionRevenue, getSongArtists, getAlbumById, getGenreTrends, getListeningTrends } from '../services/api';
+import { getTopSongs, getMostPopularArtist, getMostCollaborativeArtist, getDeviceDistribution, getSubscriptionRevenue, getSongArtists, getAlbumById, getGenreTrends, getListeningTrends, getTopSongsInCountry, getStandoutTracks } from '../services/api';
+import { usePlayer } from '../context/PlayerContext';
+import { songCover } from '../utils/images';
 import { useAuth } from '../context/AuthContext';
 import { SongRow } from '../components/Cards';
-import { BarChart3, Crown, Users, Smartphone, DollarSign, TrendingUp, Music } from 'lucide-react';
+import { BarChart3, Crown, Users, Smartphone, DollarSign, TrendingUp, Music, Globe2, Sparkles } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, CartesianGrid } from 'recharts';
 
 const COLORS = ['#1DB954', '#1ed760', '#15803d', '#4ade80', '#86efac', '#a3e635', '#22d3ee', '#818cf8'];
 
 export default function ChartsPage() {
     const { user } = useAuth();
+    const { playSong } = usePlayer();
     const isAdmin = user?.account_type === 'admin';
     const [topSongs, setTopSongs] = useState([]);
     const [popArtist, setPopArtist] = useState(null);
@@ -17,6 +20,8 @@ export default function ChartsPage() {
     const [revenue, setRevenue] = useState(null);
     const [genreTrends, setGenreTrends] = useState([]);
     const [listeningTrends, setListeningTrends] = useState([]);
+    const [countryTop, setCountryTop] = useState([]);
+    const [standout, setStandout] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -26,7 +31,7 @@ export default function ChartsPage() {
             // a non-admin to their own subscription row, so fetching it for
             // anyone else would just compute a misleadingly wrong "total".
             // Skip the call entirely rather than show that.
-            const [ts, pa, ca, dev, rev, gt, lt] = await Promise.all([
+            const [ts, pa, ca, dev, rev, gt, lt, ct, so] = await Promise.all([
                 getTopSongs(10),
                 getMostPopularArtist(),
                 getMostCollaborativeArtist(),
@@ -34,6 +39,8 @@ export default function ChartsPage() {
                 isAdmin ? getSubscriptionRevenue() : Promise.resolve(null),
                 getGenreTrends(),
                 getListeningTrends(30),
+                user?.country ? getTopSongsInCountry(user.country) : Promise.resolve([]),
+                getStandoutTracks(8),
             ]);
 
             const enriched = await Promise.all(ts.map(async (s) => {
@@ -56,10 +63,12 @@ export default function ChartsPage() {
             setRevenue(rev);
             setGenreTrends(gt);
             setListeningTrends(lt);
+            setCountryTop(ct);
+            setStandout(so);
             setLoading(false);
         }
         load();
-    }, []);
+    }, [isAdmin, user?.country]);
 
     if (loading) return <div className="p-6 text-spotify-subtle animate-pulse text-lg">Loading analytics...</div>;
 
@@ -92,7 +101,7 @@ export default function ChartsPage() {
                     <Users className="text-blue-400 mb-2" size={22} />
                     <p className="text-xs text-spotify-subtle mb-1">Most Collaborative</p>
                     <p className="font-bold">{collabArtist?.artist_name || '—'}</p>
-                    <p className="text-xs text-spotify-subtle">{collabArtist?.collaborations || 0} features</p>
+                    <p className="text-xs text-spotify-subtle">{collabArtist?.collaborations || 0} distinct collaborators</p>
                 </div>
                 <div className="glass rounded-xl p-5">
                     <TrendingUp className="text-spotify-green mb-2" size={22} />
@@ -203,6 +212,81 @@ export default function ChartsPage() {
                     </ResponsiveContainer>
                 </section>
             )}
+
+            {/* Admin: monthly revenue by plan (Q5, v_monthly_revenue) */}
+            {isAdmin && revenue?.rows?.length > 0 && (
+                <section className="glass rounded-xl p-6">
+                    <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+                        <DollarSign size={18} className="text-emerald-400" /> Monthly Revenue by Plan
+                    </h2>
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="text-left text-xs text-spotify-subtle border-b border-white/10">
+                                <th className="py-2 font-medium">Month</th>
+                                <th className="py-2 font-medium">Plan</th>
+                                <th className="py-2 font-medium text-right">Paying subscribers</th>
+                                <th className="py-2 font-medium text-right">Revenue</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {revenue.rows.map(r => (
+                                <tr key={`${r.month}-${r.plan_type}`} className="border-b border-white/5">
+                                    <td className="py-2">{r.month}</td>
+                                    <td className="py-2">{r.plan_type}</td>
+                                    <td className="py-2 text-right">{r.paying_subscribers}</td>
+                                    <td className="py-2 text-right">${r.revenue.toFixed(2)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </section>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Top songs in the viewer's country (Q1, v_top_songs_by_country) */}
+                <section className="glass rounded-xl p-6">
+                    <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
+                        <Globe2 size={18} className="text-cyan-400" /> Top in {user?.country || 'your country'}
+                    </h2>
+                    <p className="text-xs text-spotify-subtle mb-4">Last 30 days, ranked within the country</p>
+                    {countryTop.length > 0 ? (
+                        <div className="space-y-1">
+                            {countryTop.map(s => (
+                                <button key={s.song_id} onClick={() => playSong(s.song_id)} className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 text-left">
+                                    <span className="w-6 text-center font-bold text-spotify-green">{s.rank}</span>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium truncate">{s.title}</p>
+                                        <p className="text-xs text-spotify-subtle truncate">{s.artist_name}</p>
+                                    </div>
+                                    <span className="text-xs text-spotify-subtle">{s.plays} plays</span>
+                                </button>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-spotify-subtle">No plays from {user?.country || 'your country'} in the last 30 days.</p>
+                    )}
+                </section>
+
+                {/* Songs beating their own album's average (Q8, v_songs_above_album_avg) */}
+                <section className="glass rounded-xl p-6">
+                    <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
+                        <Sparkles size={18} className="text-yellow-400" /> Standout Tracks
+                    </h2>
+                    <p className="text-xs text-spotify-subtle mb-4">Played more than the average song on their own album</p>
+                    <div className="space-y-1">
+                        {standout.map(s => (
+                            <button key={s.song_id} onClick={() => playSong(s.song_id)} className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 text-left">
+                                <img src={songCover(s)} alt="" className="w-9 h-9 rounded object-cover" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">{s.title}</p>
+                                    <p className="text-xs text-spotify-subtle">album average {s.album_avg} plays</p>
+                                </div>
+                                <span className="text-xs text-spotify-green font-semibold">{s.play_count} plays</span>
+                            </button>
+                        ))}
+                    </div>
+                </section>
+            </div>
 
             {/* Top Songs List */}
             {topSongs.length > 0 && (

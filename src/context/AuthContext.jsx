@@ -31,9 +31,15 @@ export function AuthProvider({ children }) {
             }
         });
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-            const profile = await loadProfile(session?.user);
-            if (active) setUser(profile);
+        // supabase-js runs this callback while holding its internal auth lock, so
+        // awaiting another Supabase call inside it deadlocks every later query.
+        // Defer the profile load until the callback has returned (Supabase's
+        // documented pattern).
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setTimeout(async () => {
+                const profile = await loadProfile(session?.user);
+                if (active) setUser(profile);
+            }, 0);
         });
 
         return () => {

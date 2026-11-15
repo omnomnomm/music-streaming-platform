@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getUserPlaylists, getUserLikes, getUserHistory, getUserTopArtist, getUserSubscription } from '../services/api';
+import { getUserPlaylists, getUserLikes, getUserHistory, getUserTopArtist, getUserSubscription, subscribe } from '../services/api';
 import { ListMusic, Heart, Clock, Crown, User } from 'lucide-react';
 
 export default function LibraryPage() {
@@ -12,6 +12,8 @@ export default function LibraryPage() {
     const [topArtist, setTopArtist] = useState(null);
     const [subscription, setSubscription] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [subscribing, setSubscribing] = useState(false);
+    const [subError, setSubError] = useState('');
 
     useEffect(() => {
         if (!user) return;
@@ -33,6 +35,24 @@ export default function LibraryPage() {
         }
         load();
     }, [user]);
+
+    // Active = paid and not yet expired — the same test trigger T5 uses for the playlist limit.
+    const today = new Date().toISOString().slice(0, 10);
+    const isActivePaid = subscription?.payment_status === 'Paid' && subscription?.end_date >= today;
+
+    // subscribe() runs as one stored function: it inserts or renews the
+    // subscription row server-side (W3), which lifts the 5-playlist cap.
+    const handleSubscribe = async (planType) => {
+        setSubscribing(true);
+        setSubError('');
+        try {
+            setSubscription(await subscribe(planType));
+        } catch (err) {
+            setSubError(err.message);
+        } finally {
+            setSubscribing(false);
+        }
+    };
 
     if (loading) return <div className="p-6 text-spotify-subtle animate-pulse text-lg">Loading...</div>;
 
@@ -58,8 +78,25 @@ export default function LibraryPage() {
                 </div>
                 <div className="glass rounded-xl p-5 text-center">
                     <Crown className="mx-auto mb-2 text-yellow-500" size={24} />
-                    <p className="text-lg font-bold">{subscription?.plan_type || 'Free'}</p>
-                    <p className="text-xs text-spotify-subtle mt-1">{subscription?.payment_status || 'N/A'}</p>
+                    <p className="text-lg font-bold">{isActivePaid ? subscription.plan_type : 'Free'}</p>
+                    <p className="text-xs text-spotify-subtle mt-1">
+                        {isActivePaid ? `Paid · renews ${subscription.end_date}` : 'Max 5 playlists'}
+                    </p>
+                    {!isActivePaid && (
+                        <div className="flex gap-2 justify-center mt-3">
+                            {['Premium', 'Family'].map(plan => (
+                                <button
+                                    key={plan}
+                                    onClick={() => handleSubscribe(plan)}
+                                    disabled={subscribing}
+                                    className="px-3 py-1 rounded-full bg-spotify-green text-black text-xs font-semibold hover:scale-105 transition disabled:opacity-50"
+                                >
+                                    {plan}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    {subError && <p className="text-xs text-red-400 mt-2">{subError}</p>}
                 </div>
             </div>
 
