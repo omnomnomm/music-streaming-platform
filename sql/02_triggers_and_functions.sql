@@ -267,7 +267,7 @@ CREATE OR REPLACE FUNCTION add_to_playlist(
 ) RETURNS BOOLEAN AS $$
 DECLARE
     v_owner INT;
-    v_inserted BOOLEAN;
+    v_inserted INT;
 BEGIN
     SELECT user_id INTO v_owner FROM playlist WHERE playlist_id = p_playlist_id;
 
