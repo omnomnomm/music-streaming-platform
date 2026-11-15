@@ -1,9 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Prefer .env (see .env.example) — falls back to the original hardcoded demo
-// project so this keeps working if .env hasn't been set up yet.
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://kjfxctcornwtgalwemaq.supabase.co'
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtqZnhjdGNvcm53dGdhbHdlbWFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNjQzNzgsImV4cCI6MjA4Nzk0MDM3OH0.QkD4QaIjod27AlY2CO7VYZ-0iymqdUmXTlAxaId8PUc'
+// Credentials come from .env (see .env.example), which is never committed.
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY — copy .env.example to .env and fill them in.')
+}
 
 // Workaround for a known supabase-js bug: when a session already exists,
 // getSession()/onAuthStateChange can deadlock waiting on the browser's
